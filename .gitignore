@@ -18,9 +18,10 @@ captures/
 *.ipr
 .idea/workspace.xml
 
-# Backend / Python
+# Backend / Python / Executables
 backend/.venv/
 backend/.env
+backend/cloudflared.exe
 backend/__pycache__/
 backend/*/__pycache__/
 backend/*/*/__pycache__/
