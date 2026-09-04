@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.MedicalServices
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
@@ -43,7 +44,8 @@ fun MoreScreen(
     onDoctorsClick: () -> Unit = {},
     onStaffClick: () -> Unit = {},
     onFollowUpsClick: () -> Unit = {},
-    onAiAssistantClick: () -> Unit = {}
+    onAiAssistantClick: () -> Unit = {},
+    onCommunicationCenterClick: () -> Unit = {}
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
 
@@ -92,13 +94,26 @@ fun MoreScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
         ) {
-            SectionHeader(title = "AI Intelligence")
+            SectionHeader(title = "AI Intelligence & Communication")
 
             SettingsListItem(
                 title = "AI Assistant Workspace",
                 subtitle = "Follow-up recommendations, message drafting and natural language analytics",
                 icon = Icons.Outlined.AutoAwesome,
                 onClick = onAiAssistantClick
+            )
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                thickness = 0.5.dp,
+                modifier = Modifier.padding(start = 56.dp, end = 16.dp)
+            )
+
+            SettingsListItem(
+                title = "Communication Center / Drafts",
+                subtitle = "Review, approve, and copy prepared automated outreach messages",
+                icon = Icons.Outlined.Forum,
+                onClick = onCommunicationCenterClick
             )
 
             Spacer(modifier = Modifier.height(16.dp))

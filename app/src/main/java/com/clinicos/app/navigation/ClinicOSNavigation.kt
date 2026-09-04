@@ -52,6 +52,9 @@ import com.clinicos.app.feature.auth.presentation.AuthState
 import com.clinicos.app.feature.auth.presentation.AuthViewModel
 import com.clinicos.app.feature.auth.presentation.LoginScreen
 import com.clinicos.app.feature.auth.presentation.RegisterScreen
+import com.clinicos.app.feature.automation.data.AutomationRepository
+import com.clinicos.app.feature.automation.presentation.AutomationViewModel
+import com.clinicos.app.feature.automation.presentation.CommunicationCenterScreen
 import com.clinicos.app.feature.clinic.data.ClinicRepository
 import com.clinicos.app.feature.clinic.presentation.ClinicProfileScreen
 import com.clinicos.app.feature.clinic.presentation.ClinicProfileState
@@ -188,6 +191,12 @@ fun ClinicOSAppEntry() {
                     factory = AiViewModel.Factory(aiRepository)
                 )
 
+                val automationApiService = remember { ApiClient.getAutomationApiService(tokenManager) }
+                val automationRepository = remember { AutomationRepository(automationApiService) }
+                val automationViewModel: AutomationViewModel = viewModel(
+                    factory = AutomationViewModel.Factory(automationRepository)
+                )
+
                 val currentUserId = (authState as? AuthState.Authenticated)?.user?.id
 
                 ClinicOSMainScreen(
@@ -200,6 +209,7 @@ fun ClinicOSAppEntry() {
                     dashboardViewModel = dashboardViewModel,
                     notificationViewModel = notificationViewModel,
                     aiViewModel = aiViewModel,
+                    automationViewModel = automationViewModel,
                     currentUserId = currentUserId,
                     onLogout = { authViewModel.logout() }
                 )
@@ -267,6 +277,7 @@ fun ClinicOSMainScreen(
     dashboardViewModel: DashboardViewModel,
     notificationViewModel: NotificationViewModel,
     aiViewModel: AiViewModel,
+    automationViewModel: AutomationViewModel,
     currentUserId: String? = null,
     onLogout: () -> Unit = {},
     navController: NavHostController = rememberNavController()
@@ -311,7 +322,10 @@ fun ClinicOSMainScreen(
     val aiMessageState by aiViewModel.messageState.collectAsStateWithLifecycle()
     val aiAnalyticsState by aiViewModel.analyticsState.collectAsStateWithLifecycle()
 
-    var activeMessageDialogData by remember { mutableStateOf<Triple<String, String, String>?>(null) } // entityType, entityId, recipientName
+    val draftsState by automationViewModel.draftsState.collectAsStateWithLifecycle()
+    val draftActionState by automationViewModel.actionState.collectAsStateWithLifecycle()
+
+    var activeMessageDialogData by remember { mutableStateOf<Triple<String, String, String>?>(null) }
 
     val availablePatientsList = (patientsState as? com.clinicos.app.feature.patients.presentation.PatientsListState.Success)?.patients ?: emptyList()
     val availableLeadsList = (leadsState as? com.clinicos.app.feature.leads.presentation.LeadsListState.Success)?.leads ?: emptyList()
@@ -332,11 +346,11 @@ fun ClinicOSMainScreen(
     }
 
     if (activeMessageDialogData != null) {
-        val (type, id, name) = activeMessageDialogData!!
+        val dialogData = activeMessageDialogData!!
         AiMessageDialog(
-            entityType = type,
-            entityId = id,
-            recipientName = name,
+            entityType = dialogData.first,
+            entityId = dialogData.second,
+            recipientName = dialogData.third,
             messageState = aiMessageState,
             onDismiss = {
                 activeMessageDialogData = null
@@ -463,6 +477,19 @@ fun ClinicOSMainScreen(
                 )
             }
 
+            composable(Screen.CommunicationCenter.route) {
+                CommunicationCenterScreen(
+                    draftsState = draftsState,
+                    actionState = draftActionState,
+                    onRefresh = { automationViewModel.loadDrafts() },
+                    onApproveDraft = { id -> automationViewModel.approveDraft(id) },
+                    onDiscardDraft = { id -> automationViewModel.discardDraft(id) },
+                    onFilterSelect = { status -> automationViewModel.loadDrafts(status) },
+                    onClearActionState = { automationViewModel.clearActionState() },
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
             composable(Screen.AiAssistant.route) {
                 AiAssistantScreen(
                     recommendationsState = aiRecommendationsState,
@@ -527,6 +554,7 @@ fun ClinicOSMainScreen(
                         dashboardViewModel.loadDashboardSummary()
                         notificationViewModel.loadUnreadCount()
                         aiViewModel.loadInsights()
+                        automationViewModel.evaluateTimeRulesAndLoadDrafts()
                     },
                     onNavigateToPatients = {
                         navController.navigate(Screen.Patients.route) {
@@ -740,6 +768,9 @@ fun ClinicOSMainScreen(
                     },
                     onAiAssistantClick = {
                         navController.navigate(Screen.AiAssistant.route)
+                    },
+                    onCommunicationCenterClick = {
+                        navController.navigate(Screen.CommunicationCenter.route)
                     }
                 )
             }
