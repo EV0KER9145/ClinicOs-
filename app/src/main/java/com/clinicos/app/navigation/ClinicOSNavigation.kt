@@ -52,7 +52,10 @@ import com.clinicos.app.feature.clinic.presentation.ClinicViewModel
 import com.clinicos.app.feature.dashboard.DashboardScreen
 import com.clinicos.app.feature.leads.LeadsScreen
 import com.clinicos.app.feature.more.MoreScreen
-import com.clinicos.app.feature.patients.PatientsScreen
+import com.clinicos.app.feature.patients.data.PatientRepository
+import com.clinicos.app.feature.patients.presentation.PatientDetailScreen
+import com.clinicos.app.feature.patients.presentation.PatientViewModel
+import com.clinicos.app.feature.patients.presentation.PatientsScreen
 import com.clinicos.app.feature.team.data.TeamRepository
 import com.clinicos.app.feature.team.presentation.TeamScreen
 import com.clinicos.app.feature.team.presentation.TeamViewModel
@@ -121,9 +124,17 @@ fun ClinicOSAppEntry() {
                     factory = TeamViewModel.Factory(teamRepository)
                 )
 
+                val patientApiService = remember { ApiClient.getPatientApiService(tokenManager) }
+                val tagApiService = remember { ApiClient.getTagApiService(tokenManager) }
+                val patientRepository = remember { PatientRepository(patientApiService, tagApiService) }
+                val patientViewModel: PatientViewModel = viewModel(
+                    factory = PatientViewModel.Factory(patientRepository)
+                )
+
                 ClinicOSMainScreen(
                     clinicViewModel = clinicViewModel,
                     teamViewModel = teamViewModel,
+                    patientViewModel = patientViewModel,
                     onLogout = { authViewModel.logout() }
                 )
             }
@@ -183,6 +194,7 @@ fun AuthNavHost(
 fun ClinicOSMainScreen(
     clinicViewModel: ClinicViewModel,
     teamViewModel: TeamViewModel,
+    patientViewModel: PatientViewModel,
     onLogout: () -> Unit = {},
     navController: NavHostController = rememberNavController()
 ) {
@@ -195,6 +207,12 @@ fun ClinicOSMainScreen(
     val doctorsState by teamViewModel.doctorsState.collectAsStateWithLifecycle()
     val staffState by teamViewModel.staffState.collectAsStateWithLifecycle()
     val teamActionState by teamViewModel.actionState.collectAsStateWithLifecycle()
+
+    val patientsState by patientViewModel.patientsState.collectAsStateWithLifecycle()
+    val patientDetailState by patientViewModel.detailState.collectAsStateWithLifecycle()
+    val patientActionState by patientViewModel.actionState.collectAsStateWithLifecycle()
+    val searchQuery by patientViewModel.searchQuery.collectAsStateWithLifecycle()
+    val tagsState by patientViewModel.tagsState.collectAsStateWithLifecycle()
 
     // Automatic onboarding redirect check
     LaunchedEffect(profileState) {
@@ -356,7 +374,54 @@ fun ClinicOSMainScreen(
 
             composable(Screen.Patients.route) {
                 PatientsScreen(
-                    onAddPatientClick = { /* UI action placeholder */ }
+                    patientsState = patientsState,
+                    searchQuery = searchQuery,
+                    actionState = patientActionState,
+                    tagsState = tagsState,
+                    onSearchChange = { patientViewModel.onSearchQueryChanged(it) },
+                    onRefresh = { patientViewModel.loadPatients(searchQuery.ifBlank { null }) },
+                    onPatientClick = { patientId ->
+                        patientViewModel.loadPatientDetail(patientId)
+                        navController.navigate(Screen.PatientDetail.createRoute(patientId))
+                    },
+                    onCreatePatient = { name, phone, email, dob, gender, addr, notes, tagIds ->
+                        patientViewModel.createPatient(name, phone, email, dob, gender, addr, notes, tagIds)
+                    },
+                    onCreateTag = { name, onTagCreated ->
+                        patientViewModel.createTag(name, onTagCreated)
+                    },
+                    onClearActionState = { patientViewModel.clearActionState() }
+                )
+            }
+
+            composable(
+                route = Screen.PatientDetail.route,
+                arguments = listOf(navArgument("patientId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val patientId = backStackEntry.arguments?.getString("patientId") ?: ""
+                PatientDetailScreen(
+                    patientDetailState = patientDetailState,
+                    actionState = patientActionState,
+                    availableTags = tagsState.tags,
+                    onRefresh = { patientViewModel.loadPatientDetail(patientId) },
+                    onUpdatePatient = { name, phone, email, dob, gender, addr, notes ->
+                        patientViewModel.updatePatient(patientId, name, phone, email, dob, gender, addr, notes)
+                    },
+                    onUpdateTags = { tagIds ->
+                        patientViewModel.updatePatientTags(patientId, tagIds)
+                    },
+                    onAddNote = { content ->
+                        patientViewModel.addPatientNote(patientId, content)
+                    },
+                    onArchivePatient = {
+                        patientViewModel.archivePatient(patientId)
+                        navController.popBackStack()
+                    },
+                    onCreateTag = { name, onTagCreated ->
+                        patientViewModel.createTag(name, onTagCreated)
+                    },
+                    onClearActionState = { patientViewModel.clearActionState() },
+                    onBackClick = { navController.popBackStack() }
                 )
             }
 

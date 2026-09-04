@@ -56,6 +56,15 @@ sealed class Screen(
         unselectedIcon = Icons.Outlined.People
     )
 
+    object PatientDetail : Screen(
+        route = "patient_detail/{patientId}",
+        title = "Patient Profile",
+        selectedIcon = Icons.Filled.People,
+        unselectedIcon = Icons.Outlined.People
+    ) {
+        fun createRoute(patientId: String) = "patient_detail/$patientId"
+    }
+
     object Leads : Screen(
         route = "leads",
         title = "Leads",
