@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
 
 
 class ClinicBase(BaseModel):
@@ -23,7 +23,13 @@ class ClinicUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
     timezone: Optional[str] = None
-    is_active: Optional[bool] = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("Clinic name cannot be blank.")
+        return v.strip() if v else v
 
 
 class ClinicResponse(ClinicBase):
