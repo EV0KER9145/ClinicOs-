@@ -10,6 +10,7 @@ from app.models.lead import Lead, LeadSource, LeadStatus
 from app.models.lead_note import LeadNote
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.follow_up import FollowUp, FollowUpStatus
+from app.models.notification import Notification, NotificationType
 
 __all__ = [
     "Base",
@@ -30,5 +31,7 @@ __all__ = [
     "Appointment",
     "AppointmentStatus",
     "FollowUp",
-    "FollowUpStatus"
+    "FollowUpStatus",
+    "Notification",
+    "NotificationType"
 ]

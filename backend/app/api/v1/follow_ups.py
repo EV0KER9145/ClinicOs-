@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.follow_up import FollowUp, FollowUpStatus
 from app.models.lead import Lead
+from app.models.notification import NotificationType
 from app.models.patient import Patient
 from app.models.user import User
 from app.schemas.follow_up import (
@@ -16,6 +17,7 @@ from app.schemas.follow_up import (
     FollowUpResponse,
     FollowUpUpdate,
 )
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
 
@@ -77,7 +79,6 @@ def list_follow_ups(
 
     total = query.count()
 
-    # Priority ordering: PENDING first, then earliest due date
     status_priority = case(
         (FollowUp.status == FollowUpStatus.PENDING, 1),
         (FollowUp.status == FollowUpStatus.COMPLETED, 2),
@@ -107,7 +108,6 @@ def create_follow_up(
     db: Session = Depends(get_db)
 ) -> FollowUpResponse:
     """Create a new follow-up task."""
-    # Determine assignee
     target_assignee_id = fu_in.assigned_user_id or current_user.id
     assigned_user = db.query(User).filter(
         User.id == target_assignee_id,
@@ -120,7 +120,6 @@ def create_follow_up(
             detail="Assigned team member not found or inactive in your clinic."
         )
 
-    # Validate Patient relationship
     if fu_in.patient_id:
         patient = db.query(Patient).filter(
             Patient.id == fu_in.patient_id,
@@ -132,7 +131,6 @@ def create_follow_up(
                 detail="Patient record not found in your clinic."
             )
 
-    # Validate Lead relationship
     if fu_in.lead_id:
         lead = db.query(Lead).filter(
             Lead.id == fu_in.lead_id,
@@ -144,18 +142,34 @@ def create_follow_up(
                 detail="Lead record not found in your clinic."
             )
 
+    clean_title = fu_in.title.strip()
     follow_up = FollowUp(
         clinic_id=current_user.clinic_id,
         assigned_user_id=target_assignee_id,
         patient_id=fu_in.patient_id,
         lead_id=fu_in.lead_id,
-        title=fu_in.title.strip(),
+        title=clean_title,
         notes=fu_in.notes.strip() if fu_in.notes else None,
         due_at=ensure_utc(fu_in.due_at),
         status=FollowUpStatus.PENDING,
         is_active=True
     )
     db.add(follow_up)
+    db.flush()
+
+    # Trigger notification if assigned to another team member
+    if target_assignee_id != current_user.id:
+        NotificationService.create_notification(
+            db=db,
+            clinic_id=current_user.clinic_id,
+            user_id=target_assignee_id,
+            title="New Follow-up Task Assigned",
+            message=f"You have been assigned a new follow-up task: '{clean_title}'",
+            type=NotificationType.FOLLOW_UP,
+            entity_type="FOLLOW_UP",
+            entity_id=follow_up.id
+        )
+
     db.commit()
     db.refresh(follow_up)
     return follow_up
@@ -210,7 +224,7 @@ def update_follow_up(
             detail="Completed or cancelled follow-up tasks cannot be modified."
         )
 
-    if fu_in.assigned_user_id:
+    if fu_in.assigned_user_id and fu_in.assigned_user_id != follow_up.assigned_user_id:
         assigned_user = db.query(User).filter(
             User.id == fu_in.assigned_user_id,
             User.clinic_id == current_user.clinic_id
@@ -219,6 +233,18 @@ def update_follow_up(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Assigned team member not found or inactive."
+            )
+
+        if fu_in.assigned_user_id != current_user.id:
+            NotificationService.create_notification(
+                db=db,
+                clinic_id=current_user.clinic_id,
+                user_id=fu_in.assigned_user_id,
+                title="Follow-up Task Reassigned",
+                message=f"You have been assigned a follow-up task: '{follow_up.title}'",
+                type=NotificationType.FOLLOW_UP,
+                entity_type="FOLLOW_UP",
+                entity_id=follow_up.id
             )
 
     update_dict = fu_in.model_dump(exclude_unset=True)
