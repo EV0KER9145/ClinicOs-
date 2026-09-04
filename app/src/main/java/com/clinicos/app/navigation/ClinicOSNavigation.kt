@@ -38,7 +38,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.clinicos.app.core.network.ApiClient
 import com.clinicos.app.core.security.TokenManager
-import com.clinicos.app.feature.appointments.AppointmentsScreen
+import com.clinicos.app.feature.appointments.data.AppointmentRepository
+import com.clinicos.app.feature.appointments.presentation.AppointmentViewModel
+import com.clinicos.app.feature.appointments.presentation.AppointmentsScreen
 import com.clinicos.app.feature.auth.data.AuthRepository
 import com.clinicos.app.feature.auth.presentation.AuthState
 import com.clinicos.app.feature.auth.presentation.AuthViewModel
@@ -60,6 +62,7 @@ import com.clinicos.app.feature.patients.presentation.PatientDetailScreen
 import com.clinicos.app.feature.patients.presentation.PatientViewModel
 import com.clinicos.app.feature.patients.presentation.PatientsScreen
 import com.clinicos.app.feature.team.data.TeamRepository
+import com.clinicos.app.feature.team.presentation.DoctorsListState
 import com.clinicos.app.feature.team.presentation.StaffListState
 import com.clinicos.app.feature.team.presentation.TeamScreen
 import com.clinicos.app.feature.team.presentation.TeamViewModel
@@ -141,11 +144,18 @@ fun ClinicOSAppEntry() {
                     factory = LeadViewModel.Factory(leadRepository)
                 )
 
+                val appointmentApiService = remember { ApiClient.getAppointmentApiService(tokenManager) }
+                val appointmentRepository = remember { AppointmentRepository(appointmentApiService) }
+                val appointmentViewModel: AppointmentViewModel = viewModel(
+                    factory = AppointmentViewModel.Factory(appointmentRepository)
+                )
+
                 ClinicOSMainScreen(
                     clinicViewModel = clinicViewModel,
                     teamViewModel = teamViewModel,
                     patientViewModel = patientViewModel,
                     leadViewModel = leadViewModel,
+                    appointmentViewModel = appointmentViewModel,
                     onLogout = { authViewModel.logout() }
                 )
             }
@@ -207,6 +217,7 @@ fun ClinicOSMainScreen(
     teamViewModel: TeamViewModel,
     patientViewModel: PatientViewModel,
     leadViewModel: LeadViewModel,
+    appointmentViewModel: AppointmentViewModel,
     onLogout: () -> Unit = {},
     navController: NavHostController = rememberNavController()
 ) {
@@ -232,6 +243,12 @@ fun ClinicOSMainScreen(
     val leadSearchQuery by leadViewModel.searchQuery.collectAsStateWithLifecycle()
     val statusFilter by leadViewModel.statusFilter.collectAsStateWithLifecycle()
 
+    val appointmentsState by appointmentViewModel.appointmentsState.collectAsStateWithLifecycle()
+    val selectedDate by appointmentViewModel.selectedDate.collectAsStateWithLifecycle()
+    val appointmentActionState by appointmentViewModel.actionState.collectAsStateWithLifecycle()
+
+    val availablePatientsList = (patientsState as? com.clinicos.app.feature.patients.presentation.PatientsListState.Success)?.patients ?: emptyList()
+    val availableDoctorsList = (doctorsState as? DoctorsListState.Success)?.doctors ?: emptyList()
     val availableStaffList = (staffState as? StaffListState.Success)?.users ?: emptyList()
 
     // Automatic onboarding redirect check
@@ -501,7 +518,22 @@ fun ClinicOSMainScreen(
 
             composable(Screen.Appointments.route) {
                 AppointmentsScreen(
-                    onAddAppointmentClick = { /* UI action placeholder */ }
+                    appointmentsState = appointmentsState,
+                    selectedDate = selectedDate,
+                    actionState = appointmentActionState,
+                    patientsList = availablePatientsList,
+                    doctorsList = availableDoctorsList,
+                    onPreviousDay = { appointmentViewModel.selectPreviousDay() },
+                    onNextDay = { appointmentViewModel.selectNextDay() },
+                    onToday = { appointmentViewModel.selectToday() },
+                    onRefresh = { appointmentViewModel.loadAppointmentsForSelectedDate() },
+                    onBookAppointment = { patientId, doctorId, scheduledAt, dur, notes ->
+                        appointmentViewModel.bookAppointment(patientId, doctorId, scheduledAt, dur, notes)
+                    },
+                    onUpdateStatus = { apptId, status ->
+                        appointmentViewModel.updateAppointmentStatus(apptId, status)
+                    },
+                    onClearActionState = { appointmentViewModel.clearActionState() }
                 )
             }
 
