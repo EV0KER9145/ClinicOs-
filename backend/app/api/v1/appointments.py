@@ -4,6 +4,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, joinedload
+from app.automation.events import AutomationEvent, AutomationEventType
+from app.automation.service import AutomationService
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.appointment import Appointment, AppointmentStatus
@@ -40,7 +42,6 @@ def check_doctor_conflict(
     req_start = ensure_utc(requested_start)
     req_end = req_start + timedelta(minutes=duration_minutes)
 
-    # Query active appointments for doctor where status is SCHEDULED or CONFIRMED
     query = db.query(Appointment).filter(
         Appointment.clinic_id == clinic_id,
         Appointment.doctor_id == doctor_id,
@@ -56,7 +57,6 @@ def check_doctor_conflict(
         existing_start = ensure_utc(appt.scheduled_at)
         existing_end = existing_start + timedelta(minutes=appt.duration_minutes)
 
-        # Overlap condition: req_start < existing_end AND req_end > existing_start
         if req_start < existing_end and req_end > existing_start:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -122,7 +122,6 @@ def create_appointment(
     db: Session = Depends(get_db)
 ) -> AppointmentResponse:
     """Book a new appointment."""
-    # Validate Patient
     patient = db.query(Patient).filter(
         Patient.id == appt_in.patient_id,
         Patient.clinic_id == current_user.clinic_id
@@ -138,7 +137,6 @@ def create_appointment(
             detail="Cannot book an appointment for an archived/inactive patient."
         )
 
-    # Validate Doctor
     doctor = db.query(Doctor).filter(
         Doctor.id == appt_in.doctor_id,
         Doctor.clinic_id == current_user.clinic_id
@@ -154,7 +152,6 @@ def create_appointment(
             detail="Cannot book an appointment with an inactive doctor."
         )
 
-    # Conflict Detection
     check_doctor_conflict(
         db=db,
         clinic_id=current_user.clinic_id,
@@ -246,7 +243,6 @@ def update_appointment(
                 detail="Invalid or inactive doctor."
             )
 
-    # Conflict re-check if schedule or doctor changed
     if appt_in.scheduled_at or appt_in.duration_minutes or appt_in.doctor_id:
         check_doctor_conflict(
             db=db,
@@ -288,8 +284,20 @@ def update_appointment_status(
             detail="Appointment not found."
         )
 
+    old_status = appointment.status
     appointment.status = status_in.status
     db.add(appointment)
     db.commit()
     db.refresh(appointment)
+
+    # Dispatch automation domain event if appointment became NO_SHOW
+    if status_in.status == AppointmentStatus.NO_SHOW and old_status != AppointmentStatus.NO_SHOW:
+        event = AutomationEvent(
+            event_type=AutomationEventType.APPOINTMENT_NO_SHOW,
+            clinic_id=appointment.clinic_id,
+            entity_type="APPOINTMENT",
+            entity_id=appointment.id
+        )
+        AutomationService.dispatch_event(db, event)
+
     return appointment
