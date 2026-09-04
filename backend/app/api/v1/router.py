@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import health, auth, clinics, doctors, users, patients, tags, leads, appointments
+from app.api.v1 import health, auth, clinics, doctors, users, patients, tags, leads, appointments, follow_ups
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["Health"])
@@ -11,3 +11,4 @@ api_router.include_router(patients.router, prefix="/patients", tags=["Patient CR
 api_router.include_router(tags.router, prefix="/tags", tags=["Tags"])
 api_router.include_router(leads.router, prefix="/leads", tags=["Leads & Enquiries"])
 api_router.include_router(appointments.router, prefix="/appointments", tags=["Appointments & Calendar"])
+api_router.include_router(follow_ups.router, prefix="/follow-ups", tags=["Follow-ups & Task Engine"])
