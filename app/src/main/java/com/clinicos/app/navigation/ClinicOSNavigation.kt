@@ -52,6 +52,9 @@ import com.clinicos.app.feature.clinic.presentation.ClinicProfileState
 import com.clinicos.app.feature.clinic.presentation.ClinicSetupScreen
 import com.clinicos.app.feature.clinic.presentation.ClinicViewModel
 import com.clinicos.app.feature.dashboard.DashboardScreen
+import com.clinicos.app.feature.followups.data.FollowUpRepository
+import com.clinicos.app.feature.followups.presentation.FollowUpViewModel
+import com.clinicos.app.feature.followups.presentation.FollowUpsScreen
 import com.clinicos.app.feature.leads.data.LeadRepository
 import com.clinicos.app.feature.leads.presentation.LeadDetailScreen
 import com.clinicos.app.feature.leads.presentation.LeadViewModel
@@ -150,12 +153,22 @@ fun ClinicOSAppEntry() {
                     factory = AppointmentViewModel.Factory(appointmentRepository)
                 )
 
+                val followUpApiService = remember { ApiClient.getFollowUpApiService(tokenManager) }
+                val followUpRepository = remember { FollowUpRepository(followUpApiService) }
+                val followUpViewModel: FollowUpViewModel = viewModel(
+                    factory = FollowUpViewModel.Factory(followUpRepository)
+                )
+
+                val currentUserId = (authState as? AuthState.Authenticated)?.user?.id
+
                 ClinicOSMainScreen(
                     clinicViewModel = clinicViewModel,
                     teamViewModel = teamViewModel,
                     patientViewModel = patientViewModel,
                     leadViewModel = leadViewModel,
                     appointmentViewModel = appointmentViewModel,
+                    followUpViewModel = followUpViewModel,
+                    currentUserId = currentUserId,
                     onLogout = { authViewModel.logout() }
                 )
             }
@@ -218,6 +231,8 @@ fun ClinicOSMainScreen(
     patientViewModel: PatientViewModel,
     leadViewModel: LeadViewModel,
     appointmentViewModel: AppointmentViewModel,
+    followUpViewModel: FollowUpViewModel,
+    currentUserId: String? = null,
     onLogout: () -> Unit = {},
     navController: NavHostController = rememberNavController()
 ) {
@@ -247,7 +262,12 @@ fun ClinicOSMainScreen(
     val selectedDate by appointmentViewModel.selectedDate.collectAsStateWithLifecycle()
     val appointmentActionState by appointmentViewModel.actionState.collectAsStateWithLifecycle()
 
+    val followUpsState by followUpViewModel.followUpsState.collectAsStateWithLifecycle()
+    val followUpActionState by followUpViewModel.actionState.collectAsStateWithLifecycle()
+    val activeFollowUpFilter by followUpViewModel.activeFilter.collectAsStateWithLifecycle()
+
     val availablePatientsList = (patientsState as? com.clinicos.app.feature.patients.presentation.PatientsListState.Success)?.patients ?: emptyList()
+    val availableLeadsList = (leadsState as? com.clinicos.app.feature.leads.presentation.LeadsListState.Success)?.leads ?: emptyList()
     val availableDoctorsList = (doctorsState as? DoctorsListState.Success)?.doctors ?: emptyList()
     val availableStaffList = (staffState as? StaffListState.Success)?.users ?: emptyList()
 
@@ -393,11 +413,7 @@ fun ClinicOSMainScreen(
                         }
                     },
                     onAddFollowUpClick = {
-                        navController.navigate(Screen.More.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        navController.navigate(Screen.FollowUps.route)
                     },
                     onSeeAllAppointmentsClick = {
                         navController.navigate(Screen.Appointments.route) {
@@ -457,6 +473,9 @@ fun ClinicOSMainScreen(
                     onCreateTag = { name, onTagCreated ->
                         patientViewModel.createTag(name, onTagCreated)
                     },
+                    onAddFollowUpClick = { pId ->
+                        navController.navigate("${Screen.FollowUps.route}?patientId=$pId")
+                    },
                     onClearActionState = { patientViewModel.clearActionState() },
                     onBackClick = { navController.popBackStack() }
                 )
@@ -491,7 +510,6 @@ fun ClinicOSMainScreen(
                 LeadDetailScreen(
                     leadDetailState = leadDetailState,
                     actionState = leadActionState,
-                    staffMembers = availableStaffList,
                     onRefresh = { leadViewModel.loadLeadDetail(leadId) },
                     onUpdateStatus = { newStatus ->
                         leadViewModel.updateLeadStatus(leadId, newStatus)
@@ -510,6 +528,9 @@ fun ClinicOSMainScreen(
                         navController.navigate(Screen.PatientDetail.createRoute(patientId)) {
                             popUpTo(Screen.Leads.route) { inclusive = false }
                         }
+                    },
+                    onAddFollowUpClick = { lId ->
+                        navController.navigate("${Screen.FollowUps.route}?leadId=$lId")
                     },
                     onClearActionState = { leadViewModel.clearActionState() },
                     onBackClick = { navController.popBackStack() }
@@ -537,6 +558,37 @@ fun ClinicOSMainScreen(
                 )
             }
 
+            composable(
+                route = "${Screen.FollowUps.route}?patientId={patientId}&leadId={leadId}",
+                arguments = listOf(
+                    navArgument("patientId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("leadId") { type = NavType.StringType; nullable = true; defaultValue = null }
+                )
+            ) { backStackEntry ->
+                val prePatientId = backStackEntry.arguments?.getString("patientId")
+                val preLeadId = backStackEntry.arguments?.getString("leadId")
+
+                FollowUpsScreen(
+                    followUpsState = followUpsState,
+                    actionState = followUpActionState,
+                    activeFilter = activeFollowUpFilter,
+                    patientsList = availablePatientsList,
+                    leadsList = availableLeadsList,
+                    staffList = availableStaffList,
+                    currentUserId = currentUserId,
+                    preselectedPatientId = prePatientId,
+                    preselectedLeadId = preLeadId,
+                    onFilterSelect = { filter -> followUpViewModel.setFilter(filter, currentUserId) },
+                    onRefresh = { followUpViewModel.loadFollowUps(currentUserId) },
+                    onCreateFollowUp = { title, dueAt, notes, userId, pId, lId ->
+                        followUpViewModel.createFollowUp(title, dueAt, notes, userId, pId, lId)
+                    },
+                    onCompleteFollowUp = { fuId -> followUpViewModel.completeFollowUp(fuId) },
+                    onCancelFollowUp = { fuId -> followUpViewModel.cancelFollowUp(fuId) },
+                    onClearActionState = { followUpViewModel.clearActionState() }
+                )
+            }
+
             composable(Screen.More.route) {
                 MoreScreen(
                     onLogoutClick = onLogout,
@@ -548,6 +600,9 @@ fun ClinicOSMainScreen(
                     },
                     onStaffClick = {
                         navController.navigate("${Screen.Team.route}?tab=1")
+                    },
+                    onFollowUpsClick = {
+                        navController.navigate(Screen.FollowUps.route)
                     }
                 )
             }

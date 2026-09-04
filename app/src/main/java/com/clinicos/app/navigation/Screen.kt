@@ -7,11 +7,13 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -86,6 +88,13 @@ sealed class Screen(
         title = "Appts",
         selectedIcon = Icons.Filled.CalendarToday,
         unselectedIcon = Icons.Outlined.CalendarToday
+    )
+
+    object FollowUps : Screen(
+        route = "follow_ups",
+        title = "Follow-ups",
+        selectedIcon = Icons.Filled.Schedule,
+        unselectedIcon = Icons.Outlined.Schedule
     )
 
     object More : Screen(

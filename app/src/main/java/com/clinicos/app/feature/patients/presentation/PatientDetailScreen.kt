@@ -19,14 +19,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -73,6 +73,7 @@ fun PatientDetailScreen(
     onAddNote: (String) -> Unit,
     onArchivePatient: () -> Unit,
     onCreateTag: (String, (String) -> Unit) -> Unit,
+    onAddFollowUpClick: (String) -> Unit = {},
     onClearActionState: () -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -171,7 +172,11 @@ fun PatientDetailScreen(
                             .padding(20.dp)
                     ) {
                         // Header Card
-                        PatientHeaderCard(patient = patient, onEditClick = { isEditing = !isEditing })
+                        PatientHeaderCard(
+                            patient = patient,
+                            onEditClick = { isEditing = !isEditing },
+                            onAddFollowUpClick = { onAddFollowUpClick(patient.id) }
+                        )
 
                         Spacer(modifier = Modifier.height(20.dp))
 
@@ -221,7 +226,8 @@ fun PatientDetailScreen(
 @Composable
 private fun PatientHeaderCard(
     patient: PatientDetailDto,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
+    onAddFollowUpClick: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -268,6 +274,18 @@ private fun PatientHeaderCard(
                 IconButton(onClick = onEditClick) {
                     Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit Profile")
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = onAddFollowUpClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("+ Schedule Patient Follow-up")
             }
 
             if (patient.email != null || patient.gender != null || patient.address != null) {
@@ -430,7 +448,7 @@ private fun NotesCard(
                     onClick = onAddNoteClick,
                     enabled = !isAddingNote && newNoteText.isNotBlank()
                 ) {
-                    Icon(imageVector = Icons.Default.Send, contentDescription = "Add Note", tint = MaterialTheme.colorScheme.primary)
+                    Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Add Note", tint = MaterialTheme.colorScheme.primary)
                 }
             }
 

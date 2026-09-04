@@ -20,12 +20,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -61,20 +59,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.clinicos.app.core.network.dto.LeadDetailDto
-import com.clinicos.app.core.network.dto.UserDto
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeadDetailScreen(
     leadDetailState: LeadDetailState,
     actionState: LeadActionState,
-    staffMembers: List<UserDto>,
     onRefresh: () -> Unit,
     onUpdateStatus: (String) -> Unit,
     onConvertNewPatient: (name: String, phone: String?, email: String?, address: String?) -> Unit,
     onConvertExistingPatient: (existingPatientId: String) -> Unit,
     onAddNote: (String) -> Unit,
     onNavigateToPatientDetail: (String) -> Unit,
+    onAddFollowUpClick: (String) -> Unit = {},
     onClearActionState: () -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -164,7 +161,10 @@ fun LeadDetailScreen(
                             .padding(20.dp)
                     ) {
                         // Header Card
-                        LeadHeaderCard(lead = lead)
+                        LeadHeaderCard(
+                            lead = lead,
+                            onAddFollowUpClick = { onAddFollowUpClick(lead.id) }
+                        )
 
                         Spacer(modifier = Modifier.height(20.dp))
 
@@ -232,7 +232,10 @@ fun LeadDetailScreen(
 }
 
 @Composable
-private fun LeadHeaderCard(lead: LeadDetailDto) {
+private fun LeadHeaderCard(
+    lead: LeadDetailDto,
+    onAddFollowUpClick: () -> Unit
+) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(16.dp),
@@ -264,7 +267,19 @@ private fun LeadHeaderCard(lead: LeadDetailDto) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = onAddFollowUpClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("+ Schedule Lead Follow-up")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(12.dp))
 

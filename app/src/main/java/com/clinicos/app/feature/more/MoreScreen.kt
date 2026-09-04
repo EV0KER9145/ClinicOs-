@@ -40,7 +40,8 @@ fun MoreScreen(
     onLogoutClick: () -> Unit = {},
     onClinicProfileClick: () -> Unit = {},
     onDoctorsClick: () -> Unit = {},
-    onStaffClick: () -> Unit = {}
+    onStaffClick: () -> Unit = {},
+    onFollowUpsClick: () -> Unit = {}
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
 
@@ -92,10 +93,10 @@ fun MoreScreen(
             SectionHeader(title = "Clinic Operations")
 
             SettingsListItem(
-                title = "Follow-ups",
-                subtitle = "Track pending and overdue patient follow-ups",
+                title = "Follow-ups Queue",
+                subtitle = "Track pending and overdue patient & lead callbacks",
                 icon = Icons.Outlined.Schedule,
-                onClick = { /* Follow-ups management UI placeholder */ }
+                onClick = onFollowUpsClick
             )
 
             HorizontalDivider(
