@@ -19,21 +19,23 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.clinicos.app.core.network.ApiClient
 import com.clinicos.app.core.security.TokenManager
 import com.clinicos.app.feature.appointments.AppointmentsScreen
@@ -42,20 +44,28 @@ import com.clinicos.app.feature.auth.presentation.AuthState
 import com.clinicos.app.feature.auth.presentation.AuthViewModel
 import com.clinicos.app.feature.auth.presentation.LoginScreen
 import com.clinicos.app.feature.auth.presentation.RegisterScreen
+import com.clinicos.app.feature.clinic.data.ClinicRepository
+import com.clinicos.app.feature.clinic.presentation.ClinicProfileScreen
+import com.clinicos.app.feature.clinic.presentation.ClinicProfileState
+import com.clinicos.app.feature.clinic.presentation.ClinicSetupScreen
+import com.clinicos.app.feature.clinic.presentation.ClinicViewModel
 import com.clinicos.app.feature.dashboard.DashboardScreen
 import com.clinicos.app.feature.leads.LeadsScreen
 import com.clinicos.app.feature.more.MoreScreen
 import com.clinicos.app.feature.patients.PatientsScreen
+import com.clinicos.app.feature.team.data.TeamRepository
+import com.clinicos.app.feature.team.presentation.TeamScreen
+import com.clinicos.app.feature.team.presentation.TeamViewModel
 
 @Composable
 fun ClinicOSAppEntry() {
     val context = LocalContext.current.applicationContext
     val tokenManager = remember { TokenManager(context) }
-    val apiService = remember { ApiClient.getAuthApiService(tokenManager) }
-    val repository = remember { AuthRepository(apiService, tokenManager) }
+    val authApiService = remember { ApiClient.getAuthApiService(tokenManager) }
+    val authRepository = remember { AuthRepository(authApiService, tokenManager) }
 
     val authViewModel: AuthViewModel = viewModel(
-        factory = AuthViewModel.Factory(repository)
+        factory = AuthViewModel.Factory(authRepository)
     )
 
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
@@ -64,7 +74,7 @@ fun ClinicOSAppEntry() {
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        when (val state = authState) {
+        when (authState) {
             is AuthState.Loading -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -98,7 +108,22 @@ fun ClinicOSAppEntry() {
             }
 
             is AuthState.Authenticated -> {
+                val clinicApiService = remember { ApiClient.getClinicApiService(tokenManager) }
+                val clinicRepository = remember { ClinicRepository(clinicApiService) }
+                val clinicViewModel: ClinicViewModel = viewModel(
+                    factory = ClinicViewModel.Factory(clinicRepository)
+                )
+
+                val doctorApiService = remember { ApiClient.getDoctorApiService(tokenManager) }
+                val userApiService = remember { ApiClient.getUserApiService(tokenManager) }
+                val teamRepository = remember { TeamRepository(doctorApiService, userApiService) }
+                val teamViewModel: TeamViewModel = viewModel(
+                    factory = TeamViewModel.Factory(teamRepository)
+                )
+
                 ClinicOSMainScreen(
+                    clinicViewModel = clinicViewModel,
+                    teamViewModel = teamViewModel,
                     onLogout = { authViewModel.logout() }
                 )
             }
@@ -156,53 +181,79 @@ fun AuthNavHost(
 
 @Composable
 fun ClinicOSMainScreen(
+    clinicViewModel: ClinicViewModel,
+    teamViewModel: TeamViewModel,
     onLogout: () -> Unit = {},
     navController: NavHostController = rememberNavController()
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    val profileState by clinicViewModel.profileState.collectAsStateWithLifecycle()
+    val clinicSaveState by clinicViewModel.saveState.collectAsStateWithLifecycle()
+
+    val doctorsState by teamViewModel.doctorsState.collectAsStateWithLifecycle()
+    val staffState by teamViewModel.staffState.collectAsStateWithLifecycle()
+    val teamActionState by teamViewModel.actionState.collectAsStateWithLifecycle()
+
+    // Automatic onboarding redirect check
+    LaunchedEffect(profileState) {
+        if (profileState is ClinicProfileState.Success) {
+            val clinic = (profileState as ClinicProfileState.Success).clinic
+            val isSetupIncomplete = clinic.phone.isNullOrBlank() || clinic.clinicType.isNullOrBlank()
+            if (isSetupIncomplete && currentRoute != Screen.ClinicSetup.route && currentRoute != Screen.ClinicProfile.route) {
+                navController.navigate(Screen.ClinicSetup.route) {
+                    popUpTo(Screen.Dashboard.route) { inclusive = false }
+                }
+            }
+        }
+    }
+
+    val showBottomBar = currentRoute in Screen.bottomNavItems.map { it.route }
+
     Scaffold(
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp
-            ) {
-                Screen.bottomNavItems.forEach { screen ->
-                    val isSelected = currentRoute == screen.route
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = {
-                            if (currentRoute != screen.route) {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+            if (showBottomBar) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 3.dp
+                ) {
+                    Screen.bottomNavItems.forEach { screen ->
+                        val isSelected = currentRoute == screen.route
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = {
+                                if (currentRoute != screen.route) {
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
                                 }
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
-                                contentDescription = screen.title
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
+                                    contentDescription = screen.title
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = screen.title,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        },
-                        label = {
-                            Text(
-                                text = screen.title,
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    )
+                    }
                 }
             }
         }
@@ -214,6 +265,62 @@ fun ClinicOSMainScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            composable(Screen.ClinicSetup.route) {
+                val currentClinic = (profileState as? ClinicProfileState.Success)?.clinic
+                ClinicSetupScreen(
+                    currentClinic = currentClinic,
+                    saveState = clinicSaveState,
+                    onSaveClick = { name, clinicType, phone, email, timezone ->
+                        clinicViewModel.updateClinicProfile(name, clinicType, phone, email, timezone)
+                    },
+                    onSetupComplete = {
+                        clinicViewModel.clearSaveState()
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo(Screen.ClinicSetup.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.ClinicProfile.route) {
+                ClinicProfileScreen(
+                    profileState = profileState,
+                    saveState = clinicSaveState,
+                    onRefresh = { clinicViewModel.loadClinicProfile() },
+                    onSaveProfile = { name, clinicType, phone, email, timezone ->
+                        clinicViewModel.updateClinicProfile(name, clinicType, phone, email, timezone)
+                    },
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            composable(
+                route = "${Screen.Team.route}?tab={tab}",
+                arguments = listOf(navArgument("tab") {
+                    type = NavType.IntType
+                    defaultValue = 0
+                })
+            ) { backStackEntry ->
+                val tab = backStackEntry.arguments?.getInt("tab") ?: 0
+                TeamScreen(
+                    doctorsState = doctorsState,
+                    staffState = staffState,
+                    actionState = teamActionState,
+                    initialTab = tab,
+                    onRefreshDoctors = { teamViewModel.loadDoctors() },
+                    onRefreshStaff = { teamViewModel.loadStaff() },
+                    onCreateDoctor = { name, spec -> teamViewModel.createDoctor(name, spec) },
+                    onUpdateDoctor = { id, name, spec, active -> teamViewModel.updateDoctor(id, name, spec, active) },
+                    onCreateUser = { name, email, pass, role, phone -> teamViewModel.createUser(name, email, pass, role, phone) },
+                    onToggleDoctorStatus = { id, status -> teamViewModel.toggleDoctorStatus(id, status) },
+                    onToggleUserStatus = { id, status -> teamViewModel.toggleUserStatus(id, status) },
+                    onClearActionState = { teamViewModel.clearActionState() },
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
             composable(Screen.Dashboard.route) {
                 DashboardScreen(
                     onAddPatientClick = {
@@ -267,7 +374,16 @@ fun ClinicOSMainScreen(
 
             composable(Screen.More.route) {
                 MoreScreen(
-                    onLogoutClick = onLogout
+                    onLogoutClick = onLogout,
+                    onClinicProfileClick = {
+                        navController.navigate(Screen.ClinicProfile.route)
+                    },
+                    onDoctorsClick = {
+                        navController.navigate("${Screen.Team.route}?tab=0")
+                    },
+                    onStaffClick = {
+                        navController.navigate("${Screen.Team.route}?tab=1")
+                    }
                 )
             }
         }

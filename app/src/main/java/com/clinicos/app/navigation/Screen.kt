@@ -7,10 +7,12 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(
@@ -19,6 +21,27 @@ sealed class Screen(
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 ) {
+    object ClinicSetup : Screen(
+        route = "clinic_setup",
+        title = "Clinic Setup",
+        selectedIcon = Icons.Filled.Storefront,
+        unselectedIcon = Icons.Outlined.Storefront
+    )
+
+    object ClinicProfile : Screen(
+        route = "clinic_profile",
+        title = "Clinic Profile",
+        selectedIcon = Icons.Filled.Storefront,
+        unselectedIcon = Icons.Outlined.Storefront
+    )
+
+    object Team : Screen(
+        route = "team",
+        title = "Team Management",
+        selectedIcon = Icons.Filled.People,
+        unselectedIcon = Icons.Outlined.People
+    )
+
     object Dashboard : Screen(
         route = "dashboard",
         title = "Dashboard",

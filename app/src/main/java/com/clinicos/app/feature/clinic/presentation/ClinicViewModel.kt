@@ -3,7 +3,6 @@ package com.clinicos.app.feature.clinic.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.clinicos.app.core.network.dto.ClinicDto
 import com.clinicos.app.core.network.dto.UpdateClinicRequest
 import com.clinicos.app.feature.clinic.data.ClinicRepository
 import kotlinx.coroutines.flow.MutableStateFlow

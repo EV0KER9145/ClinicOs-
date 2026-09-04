@@ -25,7 +25,7 @@ android {
         }
         release {
             isMinifyEnabled = false
-            buildConfigField("String", "BASE_URL", "\"https://clinicos-api.onrender.com/\"")
+            buildConfigField("String", "BASE_URL", "\"https://clinicos-1mlt.onrender.com/\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -26,6 +26,15 @@ data class ClinicDto(
 )
 
 @JsonClass(generateAdapter = true)
+data class UpdateClinicRequest(
+    val name: String? = null,
+    @Json(name = "clinic_type") val clinicType: String? = null,
+    val phone: String? = null,
+    val email: String? = null,
+    val timezone: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class UserDto(
     val id: String,
     @Json(name = "clinic_id") val clinicId: String,

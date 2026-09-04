@@ -37,7 +37,10 @@ import com.clinicos.app.ui.components.SettingsListItem
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoreScreen(
-    onLogoutClick: () -> Unit = {}
+    onLogoutClick: () -> Unit = {},
+    onClinicProfileClick: () -> Unit = {},
+    onDoctorsClick: () -> Unit = {},
+    onStaffClick: () -> Unit = {}
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
 
@@ -103,9 +106,9 @@ fun MoreScreen(
 
             SettingsListItem(
                 title = "Doctors",
-                subtitle = "Manage doctor schedules and specialties",
+                subtitle = "Manage doctor profiles, specialties and status",
                 icon = Icons.Outlined.MedicalServices,
-                onClick = { /* Doctors management UI placeholder */ }
+                onClick = onDoctorsClick
             )
 
             HorizontalDivider(
@@ -116,9 +119,9 @@ fun MoreScreen(
 
             SettingsListItem(
                 title = "Staff & Receptionists",
-                subtitle = "Manage clinic receptionist team and permissions",
+                subtitle = "Manage clinic receptionist team, roles and access",
                 icon = Icons.Outlined.Badge,
-                onClick = { /* Staff management UI placeholder */ }
+                onClick = onStaffClick
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -127,9 +130,9 @@ fun MoreScreen(
 
             SettingsListItem(
                 title = "Clinic Profile & Settings",
-                subtitle = "SmileCare Clinic • Profile, hours and preferences",
+                subtitle = "View and update clinic details, phone and timezone",
                 icon = Icons.Outlined.Storefront,
-                onClick = { /* Clinic settings UI placeholder */ }
+                onClick = onClinicProfileClick
             )
 
             HorizontalDivider(
