@@ -1,0 +1,29 @@
+# Android & Gradle
+.gradle/
+build/
+app/build/
+local.properties
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aar
+*.aab
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea/workspace.xml
+
+# Backend / Python
+backend/.venv/
+backend/.env
+backend/__pycache__/
+backend/*/__pycache__/
+backend/*/*/__pycache__/
+backend/*/*/*/__pycache__/
+*.pyc
+.pytest_cache/
