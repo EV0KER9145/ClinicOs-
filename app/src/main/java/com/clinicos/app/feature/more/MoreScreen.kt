@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.MedicalServices
 import androidx.compose.material.icons.outlined.Schedule
@@ -41,7 +42,8 @@ fun MoreScreen(
     onClinicProfileClick: () -> Unit = {},
     onDoctorsClick: () -> Unit = {},
     onStaffClick: () -> Unit = {},
-    onFollowUpsClick: () -> Unit = {}
+    onFollowUpsClick: () -> Unit = {},
+    onAiAssistantClick: () -> Unit = {}
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
 
@@ -90,6 +92,17 @@ fun MoreScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
         ) {
+            SectionHeader(title = "AI Intelligence")
+
+            SettingsListItem(
+                title = "AI Assistant Workspace",
+                subtitle = "Follow-up recommendations, message drafting and natural language analytics",
+                icon = Icons.Outlined.AutoAwesome,
+                onClick = onAiAssistantClick
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             SectionHeader(title = "Clinic Operations")
 
             SettingsListItem(

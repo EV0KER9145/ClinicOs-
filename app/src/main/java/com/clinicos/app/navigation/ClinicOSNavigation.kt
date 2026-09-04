@@ -9,12 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MedicalServices
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -25,7 +21,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +40,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.clinicos.app.core.network.ApiClient
 import com.clinicos.app.core.security.TokenManager
+import com.clinicos.app.feature.ai.data.AiRepository
+import com.clinicos.app.feature.ai.presentation.AiAssistantScreen
+import com.clinicos.app.feature.ai.presentation.AiMessageDialog
+import com.clinicos.app.feature.ai.presentation.AiViewModel
 import com.clinicos.app.feature.appointments.data.AppointmentRepository
 import com.clinicos.app.feature.appointments.presentation.AppointmentViewModel
 import com.clinicos.app.feature.appointments.presentation.AppointmentsScreen
@@ -180,6 +182,12 @@ fun ClinicOSAppEntry() {
                     factory = NotificationViewModel.Factory(notificationRepository)
                 )
 
+                val aiApiService = remember { ApiClient.getAiApiService(tokenManager) }
+                val aiRepository = remember { AiRepository(aiApiService) }
+                val aiViewModel: AiViewModel = viewModel(
+                    factory = AiViewModel.Factory(aiRepository)
+                )
+
                 val currentUserId = (authState as? AuthState.Authenticated)?.user?.id
 
                 ClinicOSMainScreen(
@@ -191,6 +199,7 @@ fun ClinicOSAppEntry() {
                     followUpViewModel = followUpViewModel,
                     dashboardViewModel = dashboardViewModel,
                     notificationViewModel = notificationViewModel,
+                    aiViewModel = aiViewModel,
                     currentUserId = currentUserId,
                     onLogout = { authViewModel.logout() }
                 )
@@ -257,6 +266,7 @@ fun ClinicOSMainScreen(
     followUpViewModel: FollowUpViewModel,
     dashboardViewModel: DashboardViewModel,
     notificationViewModel: NotificationViewModel,
+    aiViewModel: AiViewModel,
     currentUserId: String? = null,
     onLogout: () -> Unit = {},
     navController: NavHostController = rememberNavController()
@@ -297,6 +307,12 @@ fun ClinicOSMainScreen(
     val unreadCount by notificationViewModel.unreadCount.collectAsStateWithLifecycle()
     val notificationActionState by notificationViewModel.actionState.collectAsStateWithLifecycle()
 
+    val aiRecommendationsState by aiViewModel.recommendationsState.collectAsStateWithLifecycle()
+    val aiMessageState by aiViewModel.messageState.collectAsStateWithLifecycle()
+    val aiAnalyticsState by aiViewModel.analyticsState.collectAsStateWithLifecycle()
+
+    var activeMessageDialogData by remember { mutableStateOf<Triple<String, String, String>?>(null) } // entityType, entityId, recipientName
+
     val availablePatientsList = (patientsState as? com.clinicos.app.feature.patients.presentation.PatientsListState.Success)?.patients ?: emptyList()
     val availableLeadsList = (leadsState as? com.clinicos.app.feature.leads.presentation.LeadsListState.Success)?.leads ?: emptyList()
     val availableDoctorsList = (doctorsState as? DoctorsListState.Success)?.doctors ?: emptyList()
@@ -313,6 +329,23 @@ fun ClinicOSMainScreen(
                 }
             }
         }
+    }
+
+    if (activeMessageDialogData != null) {
+        val (type, id, name) = activeMessageDialogData!!
+        AiMessageDialog(
+            entityType = type,
+            entityId = id,
+            recipientName = name,
+            messageState = aiMessageState,
+            onDismiss = {
+                activeMessageDialogData = null
+                aiViewModel.clearMessageState()
+            },
+            onGenerate = { eType, eId, purpose, tone, extra ->
+                aiViewModel.generateMessage(eType, eId, purpose, tone, extra)
+            }
+        )
     }
 
     val showBottomBar = currentRoute in Screen.bottomNavItems.map { it.route }
@@ -430,6 +463,33 @@ fun ClinicOSMainScreen(
                 )
             }
 
+            composable(Screen.AiAssistant.route) {
+                AiAssistantScreen(
+                    recommendationsState = aiRecommendationsState,
+                    analyticsState = aiAnalyticsState,
+                    onRefreshRecommendations = { aiViewModel.loadRecommendations() },
+                    onQueryAnalytics = { q -> aiViewModel.queryAnalytics(q) },
+                    onNavigateToEntity = { type, id ->
+                        when (type) {
+                            "FOLLOW_UP" -> navController.navigate(Screen.FollowUps.route)
+                            "LEAD" -> {
+                                leadViewModel.loadLeadDetail(id)
+                                navController.navigate(Screen.LeadDetail.createRoute(id))
+                            }
+                            "PATIENT" -> {
+                                patientViewModel.loadPatientDetail(id)
+                                navController.navigate(Screen.PatientDetail.createRoute(id))
+                            }
+                            "APPOINTMENT" -> navController.navigate(Screen.Appointments.route)
+                        }
+                    },
+                    onOpenMessageDialog = { type, id, name ->
+                        activeMessageDialogData = Triple(type, id, name)
+                    },
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
             composable(
                 route = "${Screen.Team.route}?tab={tab}",
                 arguments = listOf(navArgument("tab") {
@@ -466,6 +526,7 @@ fun ClinicOSMainScreen(
                     onRefresh = {
                         dashboardViewModel.loadDashboardSummary()
                         notificationViewModel.loadUnreadCount()
+                        aiViewModel.loadInsights()
                     },
                     onNavigateToPatients = {
                         navController.navigate(Screen.Patients.route) {
@@ -676,6 +737,9 @@ fun ClinicOSMainScreen(
                     },
                     onFollowUpsClick = {
                         navController.navigate(Screen.FollowUps.route)
+                    },
+                    onAiAssistantClick = {
+                        navController.navigate(Screen.AiAssistant.route)
                     }
                 )
             }
