@@ -60,17 +60,14 @@ def test_pydantic_schemas_validation():
     assert clinic_in.timezone == "Asia/Kolkata"
     assert clinic_in.is_active is True
 
-    clinic_id = uuid.uuid4()
     user_in = UserCreate(
-        clinic_id=clinic_id,
         full_name="Rajesh Admin",
         email="admin@apexhealth.com",
         password="secretpassword123",
         role=UserRole.ADMIN
     )
-    assert user_in.clinic_id == clinic_id
+    assert user_in.full_name == "Rajesh Admin"
     assert user_in.role == UserRole.ADMIN
-    assert user_in.is_active is True
 
     # Verify UserResponse schema excludes password / password_hash
     user_resp_fields = UserResponse.model_fields.keys()
