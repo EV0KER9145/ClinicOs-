@@ -50,13 +50,17 @@ import com.clinicos.app.feature.clinic.presentation.ClinicProfileState
 import com.clinicos.app.feature.clinic.presentation.ClinicSetupScreen
 import com.clinicos.app.feature.clinic.presentation.ClinicViewModel
 import com.clinicos.app.feature.dashboard.DashboardScreen
-import com.clinicos.app.feature.leads.LeadsScreen
+import com.clinicos.app.feature.leads.data.LeadRepository
+import com.clinicos.app.feature.leads.presentation.LeadDetailScreen
+import com.clinicos.app.feature.leads.presentation.LeadViewModel
+import com.clinicos.app.feature.leads.presentation.LeadsScreen
 import com.clinicos.app.feature.more.MoreScreen
 import com.clinicos.app.feature.patients.data.PatientRepository
 import com.clinicos.app.feature.patients.presentation.PatientDetailScreen
 import com.clinicos.app.feature.patients.presentation.PatientViewModel
 import com.clinicos.app.feature.patients.presentation.PatientsScreen
 import com.clinicos.app.feature.team.data.TeamRepository
+import com.clinicos.app.feature.team.presentation.StaffListState
 import com.clinicos.app.feature.team.presentation.TeamScreen
 import com.clinicos.app.feature.team.presentation.TeamViewModel
 
@@ -131,10 +135,17 @@ fun ClinicOSAppEntry() {
                     factory = PatientViewModel.Factory(patientRepository)
                 )
 
+                val leadApiService = remember { ApiClient.getLeadApiService(tokenManager) }
+                val leadRepository = remember { LeadRepository(leadApiService) }
+                val leadViewModel: LeadViewModel = viewModel(
+                    factory = LeadViewModel.Factory(leadRepository)
+                )
+
                 ClinicOSMainScreen(
                     clinicViewModel = clinicViewModel,
                     teamViewModel = teamViewModel,
                     patientViewModel = patientViewModel,
+                    leadViewModel = leadViewModel,
                     onLogout = { authViewModel.logout() }
                 )
             }
@@ -195,6 +206,7 @@ fun ClinicOSMainScreen(
     clinicViewModel: ClinicViewModel,
     teamViewModel: TeamViewModel,
     patientViewModel: PatientViewModel,
+    leadViewModel: LeadViewModel,
     onLogout: () -> Unit = {},
     navController: NavHostController = rememberNavController()
 ) {
@@ -211,8 +223,16 @@ fun ClinicOSMainScreen(
     val patientsState by patientViewModel.patientsState.collectAsStateWithLifecycle()
     val patientDetailState by patientViewModel.detailState.collectAsStateWithLifecycle()
     val patientActionState by patientViewModel.actionState.collectAsStateWithLifecycle()
-    val searchQuery by patientViewModel.searchQuery.collectAsStateWithLifecycle()
+    val patientSearchQuery by patientViewModel.searchQuery.collectAsStateWithLifecycle()
     val tagsState by patientViewModel.tagsState.collectAsStateWithLifecycle()
+
+    val leadsState by leadViewModel.leadsState.collectAsStateWithLifecycle()
+    val leadDetailState by leadViewModel.detailState.collectAsStateWithLifecycle()
+    val leadActionState by leadViewModel.actionState.collectAsStateWithLifecycle()
+    val leadSearchQuery by leadViewModel.searchQuery.collectAsStateWithLifecycle()
+    val statusFilter by leadViewModel.statusFilter.collectAsStateWithLifecycle()
+
+    val availableStaffList = (staffState as? StaffListState.Success)?.users ?: emptyList()
 
     // Automatic onboarding redirect check
     LaunchedEffect(profileState) {
@@ -375,11 +395,11 @@ fun ClinicOSMainScreen(
             composable(Screen.Patients.route) {
                 PatientsScreen(
                     patientsState = patientsState,
-                    searchQuery = searchQuery,
+                    searchQuery = patientSearchQuery,
                     actionState = patientActionState,
                     tagsState = tagsState,
                     onSearchChange = { patientViewModel.onSearchQueryChanged(it) },
-                    onRefresh = { patientViewModel.loadPatients(searchQuery.ifBlank { null }) },
+                    onRefresh = { patientViewModel.loadPatients(patientSearchQuery.ifBlank { null }) },
                     onPatientClick = { patientId ->
                         patientViewModel.loadPatientDetail(patientId)
                         navController.navigate(Screen.PatientDetail.createRoute(patientId))
@@ -427,7 +447,55 @@ fun ClinicOSMainScreen(
 
             composable(Screen.Leads.route) {
                 LeadsScreen(
-                    onAddLeadClick = { /* UI action placeholder */ }
+                    leadsState = leadsState,
+                    searchQuery = leadSearchQuery,
+                    statusFilter = statusFilter,
+                    actionState = leadActionState,
+                    staffMembers = availableStaffList,
+                    onSearchChange = { leadViewModel.onSearchQueryChanged(it) },
+                    onStatusFilterChange = { leadViewModel.onStatusFilterChanged(it) },
+                    onRefresh = { leadViewModel.loadLeads() },
+                    onLeadClick = { leadId ->
+                        leadViewModel.loadLeadDetail(leadId)
+                        navController.navigate(Screen.LeadDetail.createRoute(leadId))
+                    },
+                    onCreateLead = { name, phone, email, source, service, userId, notes ->
+                        leadViewModel.createLead(name, phone, email, source, service, userId, notes)
+                    },
+                    onClearActionState = { leadViewModel.clearActionState() }
+                )
+            }
+
+            composable(
+                route = Screen.LeadDetail.route,
+                arguments = listOf(navArgument("leadId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val leadId = backStackEntry.arguments?.getString("leadId") ?: ""
+                LeadDetailScreen(
+                    leadDetailState = leadDetailState,
+                    actionState = leadActionState,
+                    staffMembers = availableStaffList,
+                    onRefresh = { leadViewModel.loadLeadDetail(leadId) },
+                    onUpdateStatus = { newStatus ->
+                        leadViewModel.updateLeadStatus(leadId, newStatus)
+                    },
+                    onConvertNewPatient = { name, phone, email, address ->
+                        leadViewModel.convertLeadToNewPatient(leadId, name, phone, email, address)
+                    },
+                    onConvertExistingPatient = { existingPatientId ->
+                        leadViewModel.convertLeadToExistingPatient(leadId, existingPatientId)
+                    },
+                    onAddNote = { content ->
+                        leadViewModel.addLeadNote(leadId, content)
+                    },
+                    onNavigateToPatientDetail = { patientId ->
+                        patientViewModel.loadPatientDetail(patientId)
+                        navController.navigate(Screen.PatientDetail.createRoute(patientId)) {
+                            popUpTo(Screen.Leads.route) { inclusive = false }
+                        }
+                    },
+                    onClearActionState = { leadViewModel.clearActionState() },
+                    onBackClick = { navController.popBackStack() }
                 )
             }
 

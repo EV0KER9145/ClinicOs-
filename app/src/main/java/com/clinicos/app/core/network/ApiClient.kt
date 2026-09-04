@@ -17,6 +17,7 @@ object ApiClient {
     private var userApiService: UserApiService? = null
     private var patientApiService: PatientApiService? = null
     private var tagApiService: TagApiService? = null
+    private var leadApiService: LeadApiService? = null
 
     private fun getRetrofit(tokenManager: TokenManager): Retrofit {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
@@ -81,5 +82,12 @@ object ApiClient {
             tagApiService = getRetrofit(tokenManager).create(TagApiService::class.java)
         }
         return tagApiService!!
+    }
+
+    fun getLeadApiService(tokenManager: TokenManager): LeadApiService {
+        if (leadApiService == null) {
+            leadApiService = getRetrofit(tokenManager).create(LeadApiService::class.java)
+        }
+        return leadApiService!!
     }
 }

@@ -72,6 +72,15 @@ sealed class Screen(
         unselectedIcon = Icons.AutoMirrored.Outlined.Assignment
     )
 
+    object LeadDetail : Screen(
+        route = "lead_detail/{leadId}",
+        title = "Lead Details",
+        selectedIcon = Icons.AutoMirrored.Filled.Assignment,
+        unselectedIcon = Icons.AutoMirrored.Outlined.Assignment
+    ) {
+        fun createRoute(leadId: String) = "lead_detail/$leadId"
+    }
+
     object Appointments : Screen(
         route = "appointments",
         title = "Appts",
