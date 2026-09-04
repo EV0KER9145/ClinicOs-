@@ -52,6 +52,8 @@ import com.clinicos.app.feature.clinic.presentation.ClinicProfileState
 import com.clinicos.app.feature.clinic.presentation.ClinicSetupScreen
 import com.clinicos.app.feature.clinic.presentation.ClinicViewModel
 import com.clinicos.app.feature.dashboard.DashboardScreen
+import com.clinicos.app.feature.dashboard.data.DashboardRepository
+import com.clinicos.app.feature.dashboard.presentation.DashboardViewModel
 import com.clinicos.app.feature.followups.data.FollowUpRepository
 import com.clinicos.app.feature.followups.presentation.FollowUpViewModel
 import com.clinicos.app.feature.followups.presentation.FollowUpsScreen
@@ -159,6 +161,12 @@ fun ClinicOSAppEntry() {
                     factory = FollowUpViewModel.Factory(followUpRepository)
                 )
 
+                val dashboardApiService = remember { ApiClient.getDashboardApiService(tokenManager) }
+                val dashboardRepository = remember { DashboardRepository(dashboardApiService) }
+                val dashboardViewModel: DashboardViewModel = viewModel(
+                    factory = DashboardViewModel.Factory(dashboardRepository)
+                )
+
                 val currentUserId = (authState as? AuthState.Authenticated)?.user?.id
 
                 ClinicOSMainScreen(
@@ -168,6 +176,7 @@ fun ClinicOSAppEntry() {
                     leadViewModel = leadViewModel,
                     appointmentViewModel = appointmentViewModel,
                     followUpViewModel = followUpViewModel,
+                    dashboardViewModel = dashboardViewModel,
                     currentUserId = currentUserId,
                     onLogout = { authViewModel.logout() }
                 )
@@ -232,6 +241,7 @@ fun ClinicOSMainScreen(
     leadViewModel: LeadViewModel,
     appointmentViewModel: AppointmentViewModel,
     followUpViewModel: FollowUpViewModel,
+    dashboardViewModel: DashboardViewModel,
     currentUserId: String? = null,
     onLogout: () -> Unit = {},
     navController: NavHostController = rememberNavController()
@@ -265,6 +275,8 @@ fun ClinicOSMainScreen(
     val followUpsState by followUpViewModel.followUpsState.collectAsStateWithLifecycle()
     val followUpActionState by followUpViewModel.actionState.collectAsStateWithLifecycle()
     val activeFollowUpFilter by followUpViewModel.activeFilter.collectAsStateWithLifecycle()
+
+    val dashboardUiState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
 
     val availablePatientsList = (patientsState as? com.clinicos.app.feature.patients.presentation.PatientsListState.Success)?.patients ?: emptyList()
     val availableLeadsList = (leadsState as? com.clinicos.app.feature.leads.presentation.LeadsListState.Success)?.leads ?: emptyList()
@@ -398,29 +410,35 @@ fun ClinicOSMainScreen(
 
             composable(Screen.Dashboard.route) {
                 DashboardScreen(
-                    onAddPatientClick = {
+                    uiState = dashboardUiState,
+                    onRefresh = { dashboardViewModel.loadDashboardSummary() },
+                    onNavigateToPatients = {
                         navController.navigate(Screen.Patients.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
                     },
-                    onAddAppointmentClick = {
+                    onNavigateToLeads = {
+                        navController.navigate(Screen.Leads.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToAppointments = {
                         navController.navigate(Screen.Appointments.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
                     },
-                    onAddFollowUpClick = {
+                    onNavigateToFollowUps = {
                         navController.navigate(Screen.FollowUps.route)
                     },
-                    onSeeAllAppointmentsClick = {
-                        navController.navigate(Screen.Appointments.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                    onNavigateToOverdueFollowUps = {
+                        followUpViewModel.setFilter("OVERDUE", currentUserId)
+                        navController.navigate(Screen.FollowUps.route)
                     }
                 )
             }
