@@ -8,6 +8,7 @@ from app.models.patient_note import PatientNote
 from app.models.patient import Patient, patient_tags
 from app.models.lead import Lead, LeadSource, LeadStatus
 from app.models.lead_note import LeadNote
+from app.models.appointment import Appointment, AppointmentStatus
 
 __all__ = [
     "Base",
@@ -24,5 +25,7 @@ __all__ = [
     "Lead",
     "LeadSource",
     "LeadStatus",
-    "LeadNote"
+    "LeadNote",
+    "Appointment",
+    "AppointmentStatus"
 ]
