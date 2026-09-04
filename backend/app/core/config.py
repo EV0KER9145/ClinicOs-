@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Union
+from typing import List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5432/clinicos"
+
+    # AI Integration Settings
+    AI_ENABLED: bool = True
+    AI_PROVIDER: str = "gemini"
+    AI_MODEL: str = "gemini-2.5-flash"
+    AI_API_KEY: Optional[str] = None
 
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
