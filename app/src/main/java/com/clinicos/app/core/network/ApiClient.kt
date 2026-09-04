@@ -21,6 +21,7 @@ object ApiClient {
     private var appointmentApiService: AppointmentApiService? = null
     private var followUpApiService: FollowUpApiService? = null
     private var dashboardApiService: DashboardApiService? = null
+    private var notificationApiService: NotificationApiService? = null
 
     private fun getRetrofit(tokenManager: TokenManager): Retrofit {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
@@ -113,5 +114,12 @@ object ApiClient {
             dashboardApiService = getRetrofit(tokenManager).create(DashboardApiService::class.java)
         }
         return dashboardApiService!!
+    }
+
+    fun getNotificationApiService(tokenManager: TokenManager): NotificationApiService {
+        if (notificationApiService == null) {
+            notificationApiService = getRetrofit(tokenManager).create(NotificationApiService::class.java)
+        }
+        return notificationApiService!!
     }
 }

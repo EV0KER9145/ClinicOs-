@@ -20,11 +20,14 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocalHospital
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -56,6 +59,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun DashboardScreen(
     uiState: DashboardUiState,
+    unreadCount: Int = 0,
+    onNotificationClick: () -> Unit = {},
     onRefresh: () -> Unit,
     onNavigateToPatients: () -> Unit,
     onNavigateToLeads: () -> Unit,
@@ -74,6 +79,22 @@ fun DashboardScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = onNotificationClick) {
+                        BadgedBox(
+                            badge = {
+                                if (unreadCount > 0) {
+                                    Badge {
+                                        Text(if (unreadCount > 99) "99+" else unreadCount.toString())
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = "Notification Center"
+                            )
+                        }
+                    }
                     IconButton(onClick = onRefresh) {
                         Icon(imageVector = Icons.Default.Refresh, contentDescription = "Refresh Dashboard")
                     }

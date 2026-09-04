@@ -9,8 +9,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -62,6 +66,9 @@ import com.clinicos.app.feature.leads.presentation.LeadDetailScreen
 import com.clinicos.app.feature.leads.presentation.LeadViewModel
 import com.clinicos.app.feature.leads.presentation.LeadsScreen
 import com.clinicos.app.feature.more.MoreScreen
+import com.clinicos.app.feature.notifications.data.NotificationRepository
+import com.clinicos.app.feature.notifications.presentation.NotificationCenterScreen
+import com.clinicos.app.feature.notifications.presentation.NotificationViewModel
 import com.clinicos.app.feature.patients.data.PatientRepository
 import com.clinicos.app.feature.patients.presentation.PatientDetailScreen
 import com.clinicos.app.feature.patients.presentation.PatientViewModel
@@ -167,6 +174,12 @@ fun ClinicOSAppEntry() {
                     factory = DashboardViewModel.Factory(dashboardRepository)
                 )
 
+                val notificationApiService = remember { ApiClient.getNotificationApiService(tokenManager) }
+                val notificationRepository = remember { NotificationRepository(notificationApiService) }
+                val notificationViewModel: NotificationViewModel = viewModel(
+                    factory = NotificationViewModel.Factory(notificationRepository)
+                )
+
                 val currentUserId = (authState as? AuthState.Authenticated)?.user?.id
 
                 ClinicOSMainScreen(
@@ -177,6 +190,7 @@ fun ClinicOSAppEntry() {
                     appointmentViewModel = appointmentViewModel,
                     followUpViewModel = followUpViewModel,
                     dashboardViewModel = dashboardViewModel,
+                    notificationViewModel = notificationViewModel,
                     currentUserId = currentUserId,
                     onLogout = { authViewModel.logout() }
                 )
@@ -242,6 +256,7 @@ fun ClinicOSMainScreen(
     appointmentViewModel: AppointmentViewModel,
     followUpViewModel: FollowUpViewModel,
     dashboardViewModel: DashboardViewModel,
+    notificationViewModel: NotificationViewModel,
     currentUserId: String? = null,
     onLogout: () -> Unit = {},
     navController: NavHostController = rememberNavController()
@@ -277,6 +292,10 @@ fun ClinicOSMainScreen(
     val activeFollowUpFilter by followUpViewModel.activeFilter.collectAsStateWithLifecycle()
 
     val dashboardUiState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
+
+    val notificationsListState by notificationViewModel.notificationsState.collectAsStateWithLifecycle()
+    val unreadCount by notificationViewModel.unreadCount.collectAsStateWithLifecycle()
+    val notificationActionState by notificationViewModel.actionState.collectAsStateWithLifecycle()
 
     val availablePatientsList = (patientsState as? com.clinicos.app.feature.patients.presentation.PatientsListState.Success)?.patients ?: emptyList()
     val availableLeadsList = (leadsState as? com.clinicos.app.feature.leads.presentation.LeadsListState.Success)?.leads ?: emptyList()
@@ -383,6 +402,34 @@ fun ClinicOSMainScreen(
                 )
             }
 
+            composable(Screen.Notifications.route) {
+                NotificationCenterScreen(
+                    notificationsState = notificationsListState,
+                    actionState = notificationActionState,
+                    onRefresh = { notificationViewModel.loadNotifications() },
+                    onMarkRead = { id -> notificationViewModel.markAsRead(id) },
+                    onMarkAllRead = { notificationViewModel.markAllAsRead() },
+                    onNavigateToEntity = { type, id ->
+                        if (!id.isNullOrBlank()) {
+                            when (type) {
+                                "FOLLOW_UP" -> navController.navigate(Screen.FollowUps.route)
+                                "LEAD" -> {
+                                    leadViewModel.loadLeadDetail(id)
+                                    navController.navigate(Screen.LeadDetail.createRoute(id))
+                                }
+                                "PATIENT" -> {
+                                    patientViewModel.loadPatientDetail(id)
+                                    navController.navigate(Screen.PatientDetail.createRoute(id))
+                                }
+                                "APPOINTMENT" -> navController.navigate(Screen.Appointments.route)
+                            }
+                        }
+                    },
+                    onClearActionState = { notificationViewModel.clearActionState() },
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
             composable(
                 route = "${Screen.Team.route}?tab={tab}",
                 arguments = listOf(navArgument("tab") {
@@ -411,7 +458,15 @@ fun ClinicOSMainScreen(
             composable(Screen.Dashboard.route) {
                 DashboardScreen(
                     uiState = dashboardUiState,
-                    onRefresh = { dashboardViewModel.loadDashboardSummary() },
+                    unreadCount = unreadCount,
+                    onNotificationClick = {
+                        notificationViewModel.loadNotifications()
+                        navController.navigate(Screen.Notifications.route)
+                    },
+                    onRefresh = {
+                        dashboardViewModel.loadDashboardSummary()
+                        notificationViewModel.loadUnreadCount()
+                    },
                     onNavigateToPatients = {
                         navController.navigate(Screen.Patients.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
